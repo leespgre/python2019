@@ -33,9 +33,7 @@ class Filter:
         for p in range((self.N), 0, -1):
             self.out_data[0] -= self.mA[p] * self.out_data[p]
         return self.out_data[0]
-    def print(self):
-        print(self.mA)
-        print(self.mB)
+    
 
 class lowPass(Filter):
     def __init__(self,order,aT,aHerz):
