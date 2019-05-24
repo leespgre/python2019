@@ -64,9 +64,6 @@ class AudioStream(object):
                 self.traces[name] = self.rawwave.plot(pen='c', width=3)
                 self.rawwave.setYRange(-0.5, 0.5, padding=0)
                 self.rawwave.setXRange(0, 2 * self.CHUNK, padding=0.005)
-            
-         
-         
 
             if name == 'spectrum':
                 self.traces[name] = self.spectrum.plot(pen='c', width=3)
