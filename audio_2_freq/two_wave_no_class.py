@@ -26,16 +26,18 @@ T = float(CHUNK)/RATE
 
 count = 0
 raw_data = np.zeros(CHUNK)
-sin_wave = np.zeros(CALC_NUM)
+wave_inv2 = np.zeros(CALC_NUM)
 spectrum = np.zeros(CALC_NUM)
 wave_inv = np.zeros(CALC_NUM)
 
 
 dataRange = 1000
+spectrum_range = 5000
 Amp_group = np.arange(0,dataRange)
 Amp_group2 = np.arange(0,dataRange)
 
 x = np.linspace(0,CALC_NUM-1,1)
+x_spectrum = np.arange(0,spectrum_range)
 x_fft = np.linspace(0, RATE, CHUNK)
 
 sum_temp = 0
@@ -99,7 +101,7 @@ lock2 = threading.Lock()
 def audio_process():
     print("* recording")
     global lock,lock2, raw_data
-    global sin_wave, Amp_group, sum_temp, reset_cnt, amp_ave, runtime, Amp_diff, spectrum, window_y
+    global wave_inv2, Amp_group, sum_temp, reset_cnt, amp_ave, runtime, Amp_diff, spectrum, window_y, window_y2
     global  Amp_group2, sum_temp2, reset_cnt2, amp_ave2, Amp_diff2
 
     for i in range(0, LOOP_COUNT):
@@ -109,27 +111,35 @@ def audio_process():
 
         fft_data = fft(rw_data)
         sample_freq = fftfreq(rw_data.size,d=1.0/RATE)
+        spectrum = np.abs(fft_data[0:CHUNK]) * 2 / (256 * CHUNK)
+
+
         fft_data_filter = fft_data.copy()
-
         freq_high = 3500
-        freq_low = 3000
-
+        freq_low = 3100
         fft_data_filter[np.abs(sample_freq) >= freq_high] = 0
         fft_data_filter[np.abs(sample_freq) <= freq_low] = 0
         ifft_data = ifft(fft_data_filter).real
+        window_y = np.zeros(spectrum_range)
+        window_y[freq_low:freq_high] = 0.002
 
-        spectrum = np.abs(fft_data[0:CHUNK]) * 2 / (256 * CHUNK)
 
-        window_y = np.zeros(len(spectrum))
-        window_y[int((freq_low)/(RATE/CHUNK)):int((freq_high)/(RATE/CHUNK))] = 0.001 
+        fft_data_filter2 = fft_data.copy()
+        freq_high2 = 3000
+        freq_low2 = 2850
+        fft_data_filter2[np.abs(sample_freq) >= freq_high2] = 0
+        fft_data_filter2[np.abs(sample_freq) <= freq_low2] = 0
+        ifft_data2 = ifft(fft_data_filter2).real
+        window_y2 = np.zeros(spectrum_range)
+        window_y2[freq_low2:freq_high2] = 0.002
 
 
 
         for j in range(0, GROUP_NUM):
             for k in range(0, CALC_NUM):
-                sin_wave_temp = rw_data[int(CHUNK / GROUP_NUM) * j + k]
-                sin_wave[k] = sin_wave_temp
-                
+                wave_inv2_temp = ifft_data2[int(CHUNK / GROUP_NUM) * j + k]
+                wave_inv2[k] = wave_inv2_temp
+
                 wave_inv_temp = ifft_data[int(CHUNK / GROUP_NUM) * j + k]
                 wave_inv[k] = wave_inv_temp
             
@@ -141,7 +151,7 @@ def audio_process():
             lock.release()
 
             lock2.acquire()
-            Amp_temp2 = max(sin_wave) - min(sin_wave)
+            Amp_temp2 = max(wave_inv2) - min(wave_inv2)
             Amp_diff2 = filterL2.Work(Amp_temp2 - amp_ave2)
             Amp_group2 = np.append(Amp_group2, Amp_diff2)
             Amp_group2 = np.delete(Amp_group2, 0)
@@ -171,19 +181,20 @@ def audio_process():
     print("* done recording")
 
 def update():
-    global raw_data, spectrum, window_y, wave_inv
+    global raw_data, spectrum, window_y, window_y2, wave_inv, wave_inv2
     global wave, wave2, raw_wave, w3, runtime
     global fft_filter,fft_filter2, wave_diff, wave_diff2
 
     w2.setTitle('Run Time: %0.1f s' % runtime)
     wave.setData(wave_inv)
-    wave2.setData(sin_wave)
+    wave2.setData(wave_inv2)
     fft_filter.setData(x_fft,spectrum)
-    window_filter.setData(x_fft,window_y)
+    window_filter.setData(x_spectrum,window_y)
     fft_filter2.setData(x_fft,spectrum)
+    window_filter2.setData(x_spectrum,window_y2)
     wave_diff.setData(Amp_group)
     wave_diff2.setData(Amp_group2)
-    raw_wave.setData(sin_wave)
+    raw_wave.setData(wave_inv2)
    
     app.processEvents()  ## force complete redraw for every plot
 
@@ -228,10 +239,6 @@ def reset_data(channel):
     except:
         print("cannot reset")
 
-        
-
-
-
 
 w1 = pg.LayoutWidget()
 # w1.addWidget(p1,row=0,col=0)
@@ -275,13 +282,14 @@ w5=pg.PlotWidget(title="fft_filter")
 fft_filter = w5.plot(pen=pg.mkPen('c',width=1))
 window_filter = w5.plot(pen=pg.mkPen('r',width=1))
 w5.setYRange(0, 0.002, padding=0)
-w5.setXRange(20, RATE/8, padding=0.005)
+w5.setXRange(0, spectrum_range, padding=0.005)
 d3.addWidget(w5,row=3,col=0,colspan=1)
 
 w6=pg.PlotWidget(title="fft_filter2")
 fft_filter2 = w6.plot(pen=pg.mkPen('y',width=1))
+window_filter2 = w6.plot(pen=pg.mkPen('r',width=1))
 w6.setYRange(0, 0.002, padding=0)
-w6.setXRange(20, RATE/8, padding=0.005)
+w6.setXRange(0, spectrum_range, padding=0.005)
 d3.addWidget(w6,row=3,col=1,colspan=1)
 
 
@@ -303,8 +311,8 @@ timer.timeout.connect(update)
 timer.start(0)
 
 # filter
-filterL = filterClass.lowPass(2,T,10)
-filterL2 = filterClass.lowPass(2,T,10)
+filterL = filterClass.lowPass(2,T,2)
+filterL2 = filterClass.lowPass(2,T,2)
 # filter.print()
 filterH= filterClass.highPass(1,T,0.5)
 # filterH.print()
