@@ -20,7 +20,7 @@ RECORD_SECONDS = 500
 GROUP_NUM = 4
 CALC_NUM= 14
 LOOP_COUNT= int(RECORD_SECONDS/0.004)
-T = float(CHUNK)/RATE
+T = float(CHUNK)/RATE/GROUP_NUM
 
 count = 0
 sin_wave = np.zeros(CALC_NUM)
@@ -109,7 +109,7 @@ def audio_process():
             ###
 
         time_temp = time.time() - tstart
-        runtime = round((i * T), 1)
+        runtime = round((i * T * GROUP_NUM), 1)
         print("%.1f  % .1f %.1f %.1f" % (time_temp, runtime,(time_temp-runtime), Amp_diff))
     print("* done recording")
 
@@ -207,7 +207,7 @@ filterH= filterClass.highPass(1,T,0.5)
 #
 
 tstart =time.time()
-th = threading.Thread(name='audio_process', target=audio_process,  daemon=True)
+th = threading.Thread(name='audio_process', target=audio_process)
 # reset_th = threading.Thread(name='reset_process', target=reset_data)
 
 
